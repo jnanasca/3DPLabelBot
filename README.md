@@ -6,11 +6,11 @@ Design embossed text labels for 3D printing. Adjust dimensions, font, text size,
 
 Controls:
 
-Text
-Font
-Dimensions
-Corner Fillet
-Text Depth
+Text,
+Font,
+Dimensions,
+Corner Fillet,
+Text Depth,
 Text Height
 
 Export as an .STL
