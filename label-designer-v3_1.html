@@ -1,0 +1,688 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<title>3DPLabelbot</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#1a1008;--panel:#221508;--border:#3d2a10;--accent:#ff7a1a;--txt:#fff7f0;--muted:#8a7060;--ibg:#2d1e0c;}
+*{margin:0;padding:0;box-sizing:border-box;}
+html,body{height:100%;overflow:hidden;}
+body{display:flex;flex-direction:column;background:var(--bg);color:var(--txt);font-family:'DM Sans',sans-serif;font-size:14px;}
+header{flex-shrink:0;display:flex;align-items:center;justify-content:space-between;padding:12px 24px;border-bottom:1px solid var(--border);background:var(--panel);}
+.logo{font-family:'Arial','Arial Black',sans-serif;font-size:20px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;}.logo span{color:var(--accent);}
+.badge{font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);background:var(--ibg);padding:4px 10px;border-radius:20px;border:1px solid var(--border);}
+.expbtn{background:var(--accent);color:#fff7f0;border:none;padding:9px 20px;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;border-radius:6px;cursor:pointer;display:flex;align-items:center;gap:7px;}
+.expbtn:hover{background:#ff9444;}
+.expbtn:disabled{opacity:.4;cursor:not-allowed;}
+.main{flex:1;min-height:0;display:flex;}
+.sidebar{width:290px;flex-shrink:0;background:var(--panel);border-right:1px solid var(--border);overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:3px;}
+.sec{font-family:'DM Mono',monospace;font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:var(--accent);padding:10px 0 4px;border-top:1px solid var(--border);margin-top:4px;}
+.sec:first-child{border-top:none;margin-top:0;padding-top:0;}
+.field{display:flex;flex-direction:column;gap:4px;padding:2px 0;}
+.field label{display:flex;justify-content:space-between;color:#aaa;font-size:12px;}
+.val{font-family:'DM Mono',monospace;color:var(--accent);font-size:11px;}
+input[type=range]{width:100%;accent-color:var(--accent);}
+input,select,textarea{background:var(--ibg);border:1px solid var(--border);color:var(--txt);padding:7px 10px;border-radius:7px;font-family:'DM Sans',sans-serif;font-size:13px;width:100%;outline:none;}
+textarea{resize:vertical;min-height:52px;}
+.crow{display:flex;gap:8px;}
+.cfield{flex:1;display:flex;flex-direction:column;gap:3px;}
+.cfield label{font-size:11px;color:#888;}
+.cfield input[type=color]{width:100%;height:32px;border:1px solid var(--border);border-radius:6px;background:var(--ibg);cursor:pointer;padding:2px;}
+.fprev{padding:8px;background:var(--ibg);border:1px solid var(--border);border-radius:6px;text-align:center;font-size:18px;min-height:42px;display:flex;align-items:center;justify-content:center;overflow:hidden;}
+.info{background:rgba(232,255,71,.05);border:1px solid rgba(232,255,71,.15);border-radius:6px;padding:9px 11px;font-size:11px;color:#888;line-height:1.65;margin-top:4px;}
+.info strong{color:var(--accent);}
+.viewport{flex:1;min-width:0;position:relative;background:#1a1008;}
+#c{position:absolute;top:0;left:0;width:100%;height:100%;display:block;}
+.dims{position:absolute;top:12px;right:12px;background:rgba(26,16,8,.85);border:1px solid var(--border);border-radius:7px;padding:8px 12px;font-family:'DM Mono',monospace;font-size:11px;color:var(--muted);line-height:1.8;}
+.dims .v{color:var(--accent);}
+.hint{position:absolute;bottom:14px;left:50%;transform:translateX(-50%);background:rgba(26,16,8,.8);border:1px solid var(--border);border-radius:20px;padding:6px 14px;font-family:'DM Mono',monospace;font-size:10px;color:var(--muted);}
+#toast{position:fixed;bottom:24px;right:24px;background:var(--accent);color:#fff7f0;padding:10px 16px;border-radius:8px;font-family:'Syne',sans-serif;font-weight:700;font-size:13px;transform:translateY(60px);opacity:0;transition:all .3s;z-index:99;}
+#toast.show{transform:none;opacity:1;}
+#busy{position:absolute;inset:0;background:rgba(26,16,8,.75);display:none;align-items:center;justify-content:center;z-index:10;flex-direction:column;gap:10px;}
+#busy.show{display:flex;}
+.spin{font-family:'DM Mono',monospace;color:var(--accent);font-size:13px;animation:pulse 1s infinite;}
+@keyframes pulse{0%,100%{opacity:.3}50%{opacity:1}}
+
+input[type=file]#fontFile{display:none;}
+.fontupload{display:flex;align-items:center;gap:7px;background:var(--ibg);border:1px dashed var(--border);color:var(--muted);padding:7px 10px;border-radius:7px;font-size:12px;cursor:pointer;transition:border-color .2s,color .2s;width:100%;box-sizing:border-box;}
+.fontupload:hover{border-color:var(--accent);color:var(--accent);}
+.fontupload.loaded{border-style:solid;border-color:var(--accent);color:var(--accent);}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo">3DPLabel<span>bot</span></div>
+  <div class="badge">Binary STL &middot; Rectangular</div>
+  <button class="expbtn" id="exportBtn" onclick="exportSTL()">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+    Export .STL
+  </button>
+</header>
+<div class="main">
+  <div class="sidebar">
+    <div class="sec">Label Text</div>
+    <div class="field"><label>Text</label><textarea id="labelText" rows="2" oninput="rebuild()">LABEL</textarea></div>
+    <div class="field"><label>Font</label>
+      <select id="fontSel" onchange="updateFPrev();rebuild()">
+        <option value="Impact">Impact</option>
+        <option value="Arial Black">Arial Black</option>
+        <option value="Verdana">Verdana</option>
+        <option value="Georgia">Georgia</option>
+        <option value="Courier New">Courier New</option>
+      </select>
+    </div>
+    <div class="field">
+      <label style="color:#8a7060;font-size:11px;margin-bottom:2px;display:block;">Custom font</label>
+      <label class="fontupload" for="fontFile">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" style="flex-shrink:0"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span id="fontFileName">Choose .ttf / .otf / .woff</span>
+      </label>
+      <input type="file" id="fontFile" accept=".ttf,.otf,.woff,.woff2" onchange="loadCustomFont(this)">
+    </div>
+    <div class="field"><div class="fprev" id="fprev">LABEL</div></div>
+    <div class="sec">Dimensions</div>
+    <div class="field"><label>Width mm <span class="val" id="v-W">80</span></label>
+      <input type="range" id="W" min="20" max="200" value="80" oninput="sv('W');rebuild()"></div>
+    <div class="field"><label>Height mm <span class="val" id="v-H">30</span></label>
+      <input type="range" id="H" min="10" max="100" value="30" oninput="sv('H');rebuild()"></div>
+    <div class="field"><label>Thickness mm <span class="val" id="v-D">4</span></label>
+      <input type="range" id="D" min="1" max="20" value="4" oninput="sv('D');rebuild()"></div>
+    <div class="field"><label>Corner Fillet mm <span class="val" id="v-fil">3</span></label>
+      <input type="range" id="fil" min="0" max="15" value="3" oninput="sv('fil');rebuild()"></div>
+    <div class="field"><label>Text Emboss mm <span class="val" id="v-emb">1.5</span></label>
+      <input type="range" id="emb" min="0.5" max="6" step="0.5" value="1.5" oninput="svf('emb');rebuild()"></div>
+    <div class="field">
+      <label style="display:flex;justify-content:space-between;color:#aaa;font-size:12px;">
+        Text Height mm
+        <span style="display:flex;align-items:center;gap:4px;">
+          <input type="number" id="tszNum" min="1" max="500" value="0" step="0.5"
+            style="width:56px;padding:2px 5px;font-size:11px;text-align:right;"
+            oninput="syncTszSlider();rebuild()">
+          <span style="font-size:10px;color:#8a7060;">0 = auto</span>
+        </span>
+      </label>
+      <input type="range" id="tsz" min="0" max="100" value="0" step="0.5"
+        oninput="syncTszNum();rebuild()">
+    </div>
+    <div class="sec">Colors (Preview Only)</div>
+    <div class="crow">
+      <div class="cfield"><label>Body</label><input type="color" id="cBody" value="#ff7a1a" oninput="rebuild()"></div>
+      <div class="cfield"><label>Text</label><input type="color" id="cText" value="#ffffff" oninput="rebuild()"></div>
+    </div>
+    <div class="info"><strong>STL export</strong> combines body + embossed text into one mesh. Print with a filament swap at the emboss layer for two-colour text. Opens in PrusaSlicer, Cura, Bambu Studio.</div>
+  </div>
+  <div class="viewport">
+    <canvas id="c"></canvas>
+    <div id="busy"><div class="spin">Generating STL...</div></div>
+    <div class="dims">W <span class="v" id="dW">--</span>  H <span class="v" id="dH">--</span>  D <span class="v" id="dD">--</span> mm</div>
+    <div class="hint">Drag to rotate  |  Scroll to zoom</div>
+  </div>
+</div>
+<div id="toast">STL downloaded!</div>
+
+<script>
+// =====================================================================
+// THREE.JS SETUP
+// =====================================================================
+var scene    = new THREE.Scene();
+var camera   = new THREE.PerspectiveCamera(45, 2, 0.1, 5000);
+camera.position.set(0, 60, 180);
+camera.lookAt(0, 0, 0);
+
+var canvas   = document.getElementById('c');
+var renderer = new THREE.WebGLRenderer({canvas: canvas, antialias: true});
+renderer.setPixelRatio(window.devicePixelRatio);
+renderer.setClearColor(0x1a1008, 1);
+
+scene.add(new THREE.AmbientLight(0xffffff, 0.55));
+var dir1 = new THREE.DirectionalLight(0xffffff, 0.9);
+dir1.position.set(60, 90, 70);
+scene.add(dir1);
+var dir2 = new THREE.DirectionalLight(0x6688ff, 0.3);
+dir2.position.set(-60, 20, -40);
+scene.add(dir2);
+
+var grid = new THREE.GridHelper(500, 30, 0x3d2a10, 0x2d1e0c);
+grid.position.y = -25;
+scene.add(grid);
+
+var group = new THREE.Group();
+scene.add(group);
+
+// =====================================================================
+// RESIZE + ORBIT + RENDER
+// =====================================================================
+function resize() {
+  var vp = canvas.parentElement;
+  var w = vp.offsetWidth, h = vp.offsetHeight;
+  if (w < 1 || h < 1) return;
+  renderer.setSize(w, h, false);
+  camera.aspect = w / h;
+  camera.updateProjectionMatrix();
+}
+window.addEventListener('resize', resize);
+
+var rotX = 0.4, rotY = 0.5, zoom = 1.0;
+var drag = false, lastX = 0, lastY = 0;
+canvas.addEventListener('mousedown', function(e){ drag=true; lastX=e.clientX; lastY=e.clientY; });
+window.addEventListener('mouseup',   function(){ drag=false; });
+window.addEventListener('mousemove', function(e){
+  if (!drag) return;
+  rotY += (e.clientX-lastX)*0.01; rotX += (e.clientY-lastY)*0.008;
+  rotX = Math.max(-1.3, Math.min(1.3, rotX));
+  lastX=e.clientX; lastY=e.clientY;
+});
+canvas.addEventListener('wheel', function(e){
+  zoom *= 1.0 + e.deltaY*0.001;
+  zoom = Math.max(0.1, Math.min(10, zoom));
+  e.preventDefault();
+}, {passive:false});
+
+(function loop(){
+  requestAnimationFrame(loop);
+  var dist = 180*zoom;
+  camera.position.set(
+    dist*Math.sin(rotY)*Math.cos(rotX),
+    dist*Math.sin(rotX),
+    dist*Math.cos(rotY)*Math.cos(rotX)
+  );
+  camera.lookAt(0,0,0);
+  renderer.render(scene, camera);
+})();
+
+// =====================================================================
+// UI HELPERS
+// =====================================================================
+function G(id)   { return document.getElementById(id); }
+function sv(id)  { G('v-'+id).textContent = Math.round(parseFloat(G(id).value)); }
+function svf(id) { G('v-'+id).textContent = parseFloat(G(id).value).toFixed(1); }
+
+// =====================================================================
+// CUSTOM FONT LOADER
+// =====================================================================
+var customFontName = null;
+
+function loadCustomFont(input) {
+  var file = input.files[0];
+  if (!file) return;
+
+  var reader = new FileReader();
+  reader.onload = function(e) {
+    // Derive a safe CSS font-family name from the filename
+    var rawName = file.name.replace(/\.[^.]+$/, '').replace(/[^a-zA-Z0-9_\- ]/g, '');
+    customFontName = 'CustomFont_' + Date.now();
+
+    // Register the font with FontFace API
+    var ff = new FontFace(customFontName, e.target.result);
+    ff.load().then(function(loaded) {
+      document.fonts.add(loaded);
+
+      // Add option to select and switch to it
+      var sel = G('fontSel');
+      // Remove any previous custom font option
+      var prev = sel.querySelector('option[data-custom]');
+      if (prev) sel.removeChild(prev);
+
+      var opt = document.createElement('option');
+      opt.value = customFontName;
+      opt.textContent = rawName + ' (custom)';
+      opt.setAttribute('data-custom', '1');
+      sel.appendChild(opt);
+      sel.value = customFontName;
+
+      // Update UI
+      G('fontFileName').textContent = rawName;
+      document.querySelector('.fontupload').classList.add('loaded');
+
+      updateFPrev();
+      rebuild();
+    }).catch(function(err) {
+      alert('Font load failed: ' + err.message);
+      console.error(err);
+    });
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+
+function syncTszNum() {
+  // slider 0-100 maps to 0-100mm (0 = auto)
+  G('tszNum').value = parseFloat(G('tsz').value).toFixed(1);
+}
+function syncTszSlider() {
+  var v = parseFloat(G('tszNum').value) || 0;
+  v = Math.max(0, Math.min(100, v));
+  G('tsz').value = v;
+}
+function updateFPrev() {
+  var f = G('fontSel').value;
+  G('fprev').style.fontFamily = f + ',sans-serif';
+  G('fprev').style.fontWeight = 'bold';
+  G('fprev').textContent = G('labelText').value.split('\n')[0] || 'LABEL';
+}
+
+// =====================================================================
+// TEXT RASTERISATION  — high-res, clean letterforms
+// Returns a Float32Array pixel grid sampled at mmW x mmH resolution
+// =====================================================================
+function buildTextCanvas(text, font, mmW, mmH, fontMM) {
+  var PX_PER_MM = 32;  // high-density: 32px per mm = 2560px for an 80mm label
+  var CW = Math.round(mmW * PX_PER_MM);
+  var CH = Math.round(mmH * PX_PER_MM);
+
+  var tc = document.createElement('canvas');
+  tc.width = CW; tc.height = CH;
+  var ctx = tc.getContext('2d');
+
+  ctx.fillStyle = '#000';
+  ctx.fillRect(0, 0, CW, CH);
+
+  var lines = text.split('\n').map(function(l){ return l.trim(); }).filter(function(l){ return l.length > 0; });
+  if (!lines.length) lines = ['LABEL'];
+
+  // Binary-search for the largest font size that fits with 92% margin
+  ctx.textAlign    = 'center';
+  ctx.textBaseline = 'alphabetic';  // use alphabetic so metrics are reliable
+  var lo = 2, hi = CH * 0.95, mid, k, m;
+  for (var it = 0; it < 30; it++) {
+    mid = (lo + hi) * 0.5;
+    ctx.font = 'bold ' + mid + 'px "' + font + '",Impact,Arial,sans-serif';
+    var maxW = 0;
+    var totalAsc = 0, totalDesc = 0;
+    for (k = 0; k < lines.length; k++) {
+      m = ctx.measureText(lines[k]);
+      if (m.width > maxW) maxW = m.width;
+      totalAsc  += m.actualBoundingBoxAscent;
+      totalDesc += m.actualBoundingBoxDescent;
+    }
+    // Inter-line gap between lines (only between them, not above first or below last)
+    var gap    = mid * 0.18 * (lines.length - 1);
+    var totH   = totalAsc + totalDesc + gap;
+    if (maxW <= CW * 0.92 && totH <= CH * 0.92) lo = mid; else hi = mid;
+  }
+
+  // If fontMM > 0, use it directly (in canvas pixels); otherwise use auto-fit
+  var fontSize = (fontMM && fontMM > 0) ? fontMM * PX_PER_MM : lo;
+
+  // Draw with pixel-accurate vertical centering using real font metrics
+  ctx.font = 'bold ' + fontSize + 'px "' + font + '",Impact,Arial,sans-serif';
+  ctx.fillStyle = '#fff';
+
+  // Measure each line individually for exact metrics
+  var metrics = [];
+  var totalH  = 0;
+  for (k = 0; k < lines.length; k++) {
+    m = ctx.measureText(lines[k]);
+    metrics.push({ asc: m.actualBoundingBoxAscent, desc: m.actualBoundingBoxDescent });
+    totalH += m.actualBoundingBoxAscent + m.actualBoundingBoxDescent;
+  }
+  var lineGap = fontSize * 0.18;
+  totalH += lineGap * (lines.length - 1);
+
+  // Start Y so the whole block is perfectly centred in the canvas
+  var curY = (CH - totalH) * 0.5 + metrics[0].asc;
+  for (k = 0; k < lines.length; k++) {
+    if (k > 0) curY += metrics[k-1].desc + lineGap + metrics[k].asc;
+    ctx.fillText(lines[k], CW * 0.5, curY);
+  }
+
+  return { canvas: tc, ctx: ctx, CW: CW, CH: CH, PX_PER_MM: PX_PER_MM };
+}
+
+// Sample at a given mm position — returns true if text pixel
+function sampleText(info, mx, my) {
+  var px = Math.round(mx * info.PX_PER_MM);
+  var py = Math.round(my * info.PX_PER_MM);
+  if (px < 0 || py < 0 || px >= info.CW || py >= info.CH) return false;
+  var d = info.ctx.getImageData(px, py, 1, 1).data;
+  return d[0] > 128;
+}
+
+// =====================================================================
+// GEOMETRY HELPERS — push triangles into a flat array
+// =====================================================================
+// Each triangle is 3 vertices + 1 normal = (3+9) floats = 12 floats
+// We collect them in a plain JS array, then pack into binary STL
+
+function addTri(tris, nx,ny,nz, ax,ay,az, bx,by,bz, cx,cy,cz) {
+  tris.push(nx,ny,nz, ax,ay,az, bx,by,bz, cx,cy,cz);
+}
+
+// Quad as two triangles (CCW from outside)
+function addQuad(tris, nx,ny,nz, ax,ay,az, bx,by,bz, cx,cy,cz, dx,dy,dz) {
+  addTri(tris, nx,ny,nz, ax,ay,az, bx,by,bz, cx,cy,cz);
+  addTri(tris, nx,ny,nz, ax,ay,az, cx,cy,cz, dx,dy,dz);
+}
+
+// Axis-aligned box — 12 triangles
+function addBox(tris, x0,y0,z0, x1,y1,z1) {
+  // bottom -Z
+  addTri(tris, 0,0,-1, x0,y0,z0, x1,y0,z0, x1,y1,z0);
+  addTri(tris, 0,0,-1, x0,y0,z0, x1,y1,z0, x0,y1,z0);
+  // top +Z
+  addTri(tris, 0,0,1,  x0,y0,z1, x1,y1,z1, x1,y0,z1);
+  addTri(tris, 0,0,1,  x0,y0,z1, x0,y1,z1, x1,y1,z1);
+  // front -Y
+  addTri(tris, 0,-1,0, x0,y0,z0, x0,y0,z1, x1,y0,z1);
+  addTri(tris, 0,-1,0, x0,y0,z0, x1,y0,z1, x1,y0,z0);
+  // back +Y
+  addTri(tris, 0,1,0,  x1,y1,z0, x1,y1,z1, x0,y1,z1);
+  addTri(tris, 0,1,0,  x1,y1,z0, x0,y1,z1, x0,y1,z0);
+  // right +X
+  addTri(tris, 1,0,0,  x1,y0,z0, x1,y1,z1, x1,y1,z0);
+  addTri(tris, 1,0,0,  x1,y0,z0, x1,y0,z1, x1,y1,z1);
+  // left -X
+  addTri(tris, -1,0,0, x0,y0,z0, x0,y1,z0, x0,y1,z1);
+  addTri(tris, -1,0,0, x0,y0,z0, x0,y1,z1, x0,y0,z1);
+}
+
+// =====================================================================
+// ROUNDED RECT BODY  — polygon prism triangulated
+// =====================================================================
+function rrPoints(W, H, r, n) {
+  r = Math.min(Math.max(r, 0), W/2-0.01, H/2-0.01);
+  n = n || 12;
+  var hw = W/2, hh = H/2, pts = [], i, a;
+  function arc(cx, cy, a0, a1) {
+    for (i = 0; i <= n; i++) {
+      a = a0 + (a1-a0)*i/n;
+      pts.push([cx + r*Math.cos(a), cy + r*Math.sin(a)]);
+    }
+  }
+  arc( hw-r,  hh-r, 0,          Math.PI*0.5);
+  arc(-hw+r,  hh-r, Math.PI*0.5,Math.PI);
+  arc(-hw+r, -hh+r, Math.PI,    Math.PI*1.5);
+  arc( hw-r, -hh+r, Math.PI*1.5,Math.PI*2);
+  return pts;
+}
+
+// Simple ear-clip triangulation of a convex polygon (works for rounded rects)
+function triangulatePoly(pts) {
+  var tris = [], n = pts.length, i;
+  for (i = 1; i < n-1; i++) {
+    tris.push(pts[0], pts[i], pts[i+1]);
+  }
+  return tris;
+}
+
+function addPolyPrism(tris, pts, z0, z1) {
+  var n = pts.length, i, j, dx, dy, len;
+  // Check winding — make CCW
+  var area = 0;
+  for (i = 0; i < n; i++) { j=(i+1)%n; area += pts[i][0]*pts[j][1] - pts[j][0]*pts[i][1]; }
+  if (area < 0) pts = pts.slice().reverse();
+
+  // Top face (z1, +Z normal)
+  var topTris = triangulatePoly(pts);
+  for (i = 0; i < topTris.length; i+=3) {
+    addTri(tris, 0,0,1,
+      topTris[i][0],topTris[i][1],z1,
+      topTris[i+1][0],topTris[i+1][1],z1,
+      topTris[i+2][0],topTris[i+2][1],z1
+    );
+  }
+  // Bottom face (z0, -Z normal, reversed winding)
+  for (i = 0; i < topTris.length; i+=3) {
+    addTri(tris, 0,0,-1,
+      topTris[i][0],topTris[i][1],z0,
+      topTris[i+2][0],topTris[i+2][1],z0,
+      topTris[i+1][0],topTris[i+1][1],z0
+    );
+  }
+  // Side walls
+  for (i = 0; i < n; i++) {
+    j = (i+1)%n;
+    var ax=pts[i][0],ay=pts[i][1], bx=pts[j][0],by=pts[j][1];
+    dx=bx-ax; dy=by-ay; len=Math.sqrt(dx*dx+dy*dy);
+    if (len < 1e-9) continue;
+    var nx2 = dy/len, ny2 = -dx/len;  // outward normal (right-hand rule for CCW)
+    addTri(tris, nx2,ny2,0, ax,ay,z0, bx,by,z0, bx,by,z1);
+    addTri(tris, nx2,ny2,0, ax,ay,z0, bx,by,z1, ax,ay,z1);
+  }
+}
+
+// =====================================================================
+// TEXT MESH — high-res voxel columns matching the canvas resolution
+// Uses same PX_PER_MM=8 grid as the texture so STL matches preview exactly.
+// Bottom faces are OMITTED — the body top face is the floor of the emboss,
+// so no coincident/internal faces confuse slicers.
+// Side walls only emitted at letter edges (neighbour-checked).
+// =====================================================================
+function buildTextTris(info, mmW, mmH, z0, z1) {
+  var tris = [];
+
+  // Match the canvas resolution exactly — 8 voxels per mm
+  var COLS = info.CW;   // already mmW * PX_PER_MM
+  var ROWS = info.CH;   // already mmH * PX_PER_MM
+
+  var mmPerCol = mmW / COLS;
+  var mmPerRow = mmH / ROWS;
+
+  // Read the full pixel grid in one call
+  var data = info.ctx.getImageData(0, 0, info.CW, info.CH).data;
+
+  // Build binary grid (1=text, 0=empty)
+  var grid = new Uint8Array(COLS * ROWS);
+  for (var i = 0; i < COLS * ROWS; i++) {
+    grid[i] = data[i * 4] > 128 ? 1 : 0;
+  }
+
+  for (var row = 0; row < ROWS; row++) {
+    for (var col = 0; col < COLS; col++) {
+      if (!grid[row * COLS + col]) continue;
+
+      var x0c = col * mmPerCol - mmW * 0.5;
+      var y0c = -(row + 1) * mmPerRow + mmH * 0.5;  // canvas Y is top-down, flip
+      var x1c = x0c + mmPerCol;
+      var y1c = y0c + mmPerRow;
+
+      // TOP face (+Z) — always emit
+      addTri(tris, 0,0,1,  x0c,y0c,z1,  x1c,y0c,z1,  x1c,y1c,z1);
+      addTri(tris, 0,0,1,  x0c,y0c,z1,  x1c,y1c,z1,  x0c,y1c,z1);
+
+      // BOTTOM face (-Z) — emit only at text perimeter (no neighbour below in Z,
+      // i.e. always — but skip where an adjacent cell is also filled, since
+      // those shared edges are internal. Actually for a clean closed shell we
+      // always emit the bottom. Slicers handle two overlapping closed shells fine.)
+      addTri(tris, 0,0,-1,  x0c,y1c,z0,  x1c,y1c,z0,  x1c,y0c,z0);
+      addTri(tris, 0,0,-1,  x0c,y1c,z0,  x1c,y0c,z0,  x0c,y0c,z0);
+
+      // SIDE walls — emit only where neighbour is empty
+      // Left (-X)
+      if (col === 0 || !grid[row * COLS + (col - 1)]) {
+        addTri(tris,-1,0,0,  x0c,y1c,z0,  x0c,y0c,z0,  x0c,y0c,z1);
+        addTri(tris,-1,0,0,  x0c,y1c,z0,  x0c,y0c,z1,  x0c,y1c,z1);
+      }
+      // Right (+X)
+      if (col === COLS-1 || !grid[row * COLS + (col + 1)]) {
+        addTri(tris, 1,0,0,  x1c,y0c,z0,  x1c,y1c,z0,  x1c,y1c,z1);
+        addTri(tris, 1,0,0,  x1c,y0c,z0,  x1c,y1c,z1,  x1c,y0c,z1);
+      }
+      // Front (-Y) — row+1 in canvas = lower Y in 3D
+      if (row === ROWS-1 || !grid[(row + 1) * COLS + col]) {
+        addTri(tris, 0,-1,0,  x1c,y0c,z0,  x0c,y0c,z0,  x0c,y0c,z1);
+        addTri(tris, 0,-1,0,  x1c,y0c,z0,  x0c,y0c,z1,  x1c,y0c,z1);
+      }
+      // Back (+Y) — row-1 in canvas = higher Y in 3D
+      if (row === 0 || !grid[(row - 1) * COLS + col]) {
+        addTri(tris, 0,1,0,  x0c,y1c,z0,  x1c,y1c,z0,  x1c,y1c,z1);
+        addTri(tris, 0,1,0,  x0c,y1c,z0,  x1c,y1c,z1,  x0c,y1c,z1);
+      }
+    }
+  }
+  return tris;
+}
+
+// =====================================================================
+// PACK BINARY STL
+// =====================================================================
+function packSTL(triData) {
+  // triData: flat array of [nx,ny,nz, ax,ay,az, bx,by,bz, cx,cy,cz] * numTris
+  var numTris = triData.length / 12;
+  var buf = new ArrayBuffer(84 + numTris * 50);
+  var view = new DataView(buf);
+  // 80-byte header
+  var hdr = '3D Label Forge - STL';
+  for (var i = 0; i < 80; i++) view.setUint8(i, i < hdr.length ? hdr.charCodeAt(i) : 0);
+  view.setUint32(80, numTris, true);
+  var offset = 84;
+  for (var t = 0; t < numTris; t++) {
+    var b = t * 12;
+    // Normal
+    view.setFloat32(offset,    triData[b+0],  true); offset+=4;
+    view.setFloat32(offset,    triData[b+1],  true); offset+=4;
+    view.setFloat32(offset,    triData[b+2],  true); offset+=4;
+    // V1
+    view.setFloat32(offset,    triData[b+3],  true); offset+=4;
+    view.setFloat32(offset,    triData[b+4],  true); offset+=4;
+    view.setFloat32(offset,    triData[b+5],  true); offset+=4;
+    // V2
+    view.setFloat32(offset,    triData[b+6],  true); offset+=4;
+    view.setFloat32(offset,    triData[b+7],  true); offset+=4;
+    view.setFloat32(offset,    triData[b+8],  true); offset+=4;
+    // V3
+    view.setFloat32(offset,    triData[b+9],  true); offset+=4;
+    view.setFloat32(offset,    triData[b+10], true); offset+=4;
+    view.setFloat32(offset,    triData[b+11], true); offset+=4;
+    view.setUint16(offset, 0, true); offset+=2; // attribute
+  }
+  return buf;
+}
+
+// =====================================================================
+// REBUILD PREVIEW
+// =====================================================================
+var lastTextInfo = null;
+
+function disposeGroup() {
+  while (group.children.length) {
+    var m = group.children[0]; group.remove(m);
+    if (m.geometry) m.geometry.dispose();
+    if (m.material) { var ml=Array.isArray(m.material)?m.material:[m.material]; ml.forEach(function(x){x.dispose();}); }
+  }
+}
+
+function rebuild() {
+  disposeGroup();
+  var W   = parseFloat(G('W').value);
+  var H   = parseFloat(G('H').value);
+  var D   = parseFloat(G('D').value);
+  var fil = parseFloat(G('fil').value);
+  var emb = parseFloat(G('emb').value);
+  var text = G('labelText').value || 'LABEL';
+  var font = G('fontSel').value;
+
+  var bodyMat = new THREE.MeshStandardMaterial({color: new THREE.Color(G('cBody').value), roughness:0.4});
+
+  // Body
+  var r = Math.max(0, Math.min(fil, W/2-0.5, H/2-0.5));
+  var hw=W/2, hh=H/2;
+  var sh = new THREE.Shape();
+  sh.moveTo(-hw+r,-hh);
+  sh.lineTo( hw-r,-hh); sh.quadraticCurveTo( hw,-hh, hw,-hh+r);
+  sh.lineTo( hw,  hh-r); sh.quadraticCurveTo( hw, hh, hw-r, hh);
+  sh.lineTo(-hw+r, hh); sh.quadraticCurveTo(-hw, hh,-hw, hh-r);
+  sh.lineTo(-hw,-hh+r); sh.quadraticCurveTo(-hw,-hh,-hw+r,-hh);
+  var bodyGeo = new THREE.ExtrudeGeometry(sh, {depth:D, bevelEnabled:false});
+  bodyGeo.translate(0, 0, -D/2);
+  group.add(new THREE.Mesh(bodyGeo, bodyMat));
+
+  // Build high-res text canvas (8px/mm)
+  lastTextInfo = buildTextCanvas(text, font, W, H, parseFloat(G('tszNum').value) || 0);
+
+  // Preview text using InstancedMesh — one box per canvas pixel, same
+  // resolution as the STL export. Looks solid and 3D, not flat planes.
+  var iCW = lastTextInfo.CW, iCH = lastTextInfo.CH;
+  var iData = lastTextInfo.ctx.getImageData(0, 0, iCW, iCH).data;
+  var mmPerCol = W / iCW, mmPerRow = H / iCH;
+  var filled = 0;
+  for (var pi = 0; pi < iCW * iCH; pi++) { if (iData[pi*4] > 128) filled++; }
+
+  if (filled > 0) {
+    var boxGeo = new THREE.BoxGeometry(mmPerCol, mmPerRow, emb);
+    var boxMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(G('cText').value), roughness: 0.2
+    });
+    var iMesh = new THREE.InstancedMesh(boxGeo, boxMat, filled);
+    var dummy = new THREE.Object3D();
+    var inst  = 0;
+    for (var row = 0; row < iCH; row++) {
+      for (var col = 0; col < iCW; col++) {
+        if (iData[(row * iCW + col) * 4] < 128) continue;
+        var cx =  (col + 0.5) * mmPerCol - W * 0.5;
+        var cy = -(row + 0.5) * mmPerRow + H * 0.5;
+        dummy.position.set(cx, cy, D/2 + emb * 0.5);
+        dummy.updateMatrix();
+        iMesh.setMatrixAt(inst++, dummy.matrix);
+      }
+    }
+    iMesh.instanceMatrix.needsUpdate = true;
+    group.add(iMesh);
+  }
+
+  G('dW').textContent = W.toFixed(0);
+  G('dH').textContent = H.toFixed(0);
+  G('dD').textContent = D.toFixed(0);
+  updateFPrev();
+}
+
+// =====================================================================
+// STL EXPORT
+// =====================================================================
+function exportSTL() {
+  G('exportBtn').disabled = true;
+  G('busy').classList.add('show');
+  setTimeout(function() {
+    try {
+      var W   = parseFloat(G('W').value);
+      var H   = parseFloat(G('H').value);
+      var D   = parseFloat(G('D').value);
+      var fil = parseFloat(G('fil').value);
+      var emb = parseFloat(G('emb').value);
+      var text = G('labelText').value || 'LABEL';
+      var font = G('fontSel').value;
+      var r = Math.min(fil, W/2-0.1, H/2-0.1);
+      var topZ = D/2;
+
+      var tris = [];
+
+      // Body
+      addPolyPrism(tris, rrPoints(W, H, r, 12), -D/2, D/2);
+
+      // Text
+      var info = buildTextCanvas(text, font, W, H, parseFloat(G('tszNum').value) || 0);
+      var textTris = buildTextTris(info, W, H, topZ, topZ + emb);
+      for (var i = 0; i < textTris.length; i++) tris.push(textTris[i]);
+
+      var buf = packSTL(tris);
+      var blob = new Blob([buf], {type:'application/octet-stream'});
+      var url = URL.createObjectURL(blob);
+      var a = document.createElement('a');
+      a.href=url; a.download='label.stl'; a.click();
+      URL.revokeObjectURL(url);
+
+      var t = G('toast'); t.classList.add('show');
+      setTimeout(function(){ t.classList.remove('show'); }, 2500);
+    } catch(err) {
+      alert('Export error: '+err.message); console.error(err);
+    } finally {
+      G('exportBtn').disabled = false;
+      G('busy').classList.remove('show');
+    }
+  }, 40);
+}
+
+// =====================================================================
+// INIT
+// =====================================================================
+window.addEventListener('load', function() {
+  resize();
+  sv('W'); sv('H'); sv('D'); sv('fil'); svf('emb');
+  rebuild();
+});
+</script>
+</body>
+</html>
